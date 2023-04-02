@@ -14,6 +14,7 @@ namespace CityManagerEditor
         public GameObject[] prefabs;
         private GameObject prefab = null;
         public float gridSize = 1.0f;
+        private Vector3 gizmoPosition = Vector3.zero;
 
         [SerializeField]
         public VisualTreeAsset m_VisualTreeAsset = default;
@@ -36,6 +37,24 @@ namespace CityManagerEditor
             SceneView.duringSceneGui += OnSceneGUIHandler;
         }
 
+        private void OnEnable()
+        {
+            SceneView.duringSceneGui += UpdateGizmoPositionHandler;
+        }
+
+
+        private static void UpdateGizmoPositionHandler(SceneView sceneView)
+        {
+            // Find all instances of MapEditor in the scene
+            MapEditor[] mapEditors = Resources.FindObjectsOfTypeAll<MapEditor>();
+
+            // Call the OnSceneGUI method for each instance
+            foreach (MapEditor mapEditor in mapEditors)
+            {
+                mapEditor.UpdateGizmoPosition();
+            }
+        }
+
         private static void OnSceneGUIHandler(SceneView sceneView)
         {
             // Find all instances of MapEditor in the scene
@@ -47,6 +66,8 @@ namespace CityManagerEditor
                 mapEditor.OnSceneGUI();
             }
         }
+
+
 
         private void OnGUI()
         {
@@ -85,30 +106,71 @@ namespace CityManagerEditor
         }
 
         [DrawGizmo(GizmoType.NonSelected)]
-        void OnSceneGUI()
+        private void OnSceneGUI()
         {
+
+            // Draw a gizmo at the gizmoPosition
+            Handles.color = Color.green;
+            Handles.DrawWireCube(gizmoPosition, Vector3.one * gridSize);
+
+            // Draw a gizmo at the mouse hit position
+            Handles.color = Color.green;
+            Handles.DrawWireCube(gizmoPosition, Vector3.one * gridSize);
+
+            Vector3 nearestGridPoint = GetNearestPointOnGrid(gizmoPosition);
+
+            Debug.Log("Cube at " + nearestGridPoint);
+            Handles.color = Color.green;
+            Handles.DrawWireCube(nearestGridPoint, Vector3.one * gridSize);
+
+
+
             // Check if the left mouse button is pressed down
             if (Event.current.type == EventType.MouseDown && Event.current.button == 0)
             {
-                // Get the current mouse position in world space
-                Vector3 mousePosition = Event.current.mousePosition;
-                mousePosition.y = Camera.current.pixelHeight - mousePosition.y;
-                mousePosition = Camera.current.ScreenToWorldPoint(mousePosition);
-
-                // Snap the mouse position to the nearest grid point
-                Vector3 gridPosition = GetNearestPointOnGrid(mousePosition);
-
-                // Create a new instance of the selected prefab at the grid position
-                if (prefab != null)
-                {
-                    GameObject instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
-                    instance.transform.position = gridPosition;
-
-                    Debug.Log("Prefab instantiated at " + gridPosition);
-
-                }
+                // Create a new instance of the selected prefab at the nearest grid point
+                GameObject instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+                instance.transform.position = nearestGridPoint;
+                Debug.Log("Spawned " + instance.name + " at " + nearestGridPoint);
             }
         }
+
+        private void UpdateGizmoPosition()
+        {
+            // Update the gizmo position based on the mouse position
+            Event e = Event.current;
+            if (e.type == EventType.MouseMove)
+            {
+                gizmoPosition = GetMouseHitPosition(e);
+                SceneView.RepaintAll();
+                Debug.Log("Mouse at " + gizmoPosition);
+            }
+        }
+
+        private Vector3 GetMouseHitPosition(Event e)
+        {
+            Vector3 position = Vector3.zero;
+
+            // Calculate the direction from the camera to the mouse cursor
+            Camera currentCamera = SceneView.lastActiveSceneView.camera;
+            Vector3 mousePosition = e.mousePosition;
+            mousePosition.z = currentCamera.nearClipPlane;
+            Vector3 worldPosition = currentCamera.ScreenToWorldPoint(mousePosition);
+            Vector3 direction = (worldPosition - currentCamera.transform.position);
+
+            Debug.DrawLine(currentCamera.transform.position, currentCamera.transform.position + direction * 1000f, Color.yellow);
+
+            // Perform a raycast and check if it hit anything
+            RaycastHit hit;
+            if (Physics.Raycast(currentCamera.transform.position, direction, out hit, 1000f))
+            {
+                position = hit.point;
+                Debug.Log("Hit " + position);
+            }
+
+            return position;
+        }
+
 
 
         public Vector3 GetNearestPointOnGrid(Vector3 position)
