@@ -13,6 +13,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: Ground tile Variant
       objectReference: {fileID: 0}
+    - target: {fileID: -8406741693942925843, guid: dfc9fb18793283a41a2b3d7b72e91b3b,
+        type: 3}
+      propertyPath: m_TagString
+      value: Tile
+      objectReference: {fileID: 0}
     - target: {fileID: -1564261159322371028, guid: dfc9fb18793283a41a2b3d7b72e91b3b,
         type: 3}
       propertyPath: m_RootOrder

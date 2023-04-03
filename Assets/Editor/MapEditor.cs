@@ -1,33 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-
 namespace CityManagerEditor
 {
-
-    struct MapObject
-    {
-        public GameObject instance;
-        public Vector3 position;
-        public MapObject(GameObject gameObject, Vector3 position)
-        {
-            this.instance = gameObject;
-            this.position = position;
-        }
-    }
-
-
     public class MapEditor : EditorWindow
     {
-
         public GameObject[] prefabs;
         private GameObject prefab = null;
+
         public float gridSize = 1.0f;
         private Vector3 gizmoPosition = Vector3.zero;
-        private List<MapObject> mapObjects = new List<MapObject>();
 
         [SerializeField]
         public VisualTreeAsset m_VisualTreeAsset = default;
@@ -39,10 +25,7 @@ namespace CityManagerEditor
             wnd.titleContent = new GUIContent("GridBrush");
         }
 
-        public void CreateGUI()
-        {
-
-        }
+        public void CreateGUI() { }
 
         [InitializeOnLoadMethod]
         public static void Initialize()
@@ -54,7 +37,6 @@ namespace CityManagerEditor
         {
             SceneView.duringSceneGui += UpdateGizmoPositionHandler;
         }
-
 
         private static void UpdateGizmoPositionHandler(SceneView sceneView)
         {
@@ -80,8 +62,6 @@ namespace CityManagerEditor
             }
         }
 
-
-
         private void OnGUI()
         {
             // Create GUI layout for prefab palette
@@ -99,7 +79,6 @@ namespace CityManagerEditor
             // Draw a line to separate the palette from the scene view
             GUILayout.Box("", GUILayout.ExpandWidth(true), GUILayout.Height(1));
 
-
             // Create GUI layout for brush settings
             GUILayout.BeginVertical();
             GUILayout.Label("Brush Settings:");
@@ -110,7 +89,9 @@ namespace CityManagerEditor
             }
 
             // Show the prefab field in the GUI
-            prefab = EditorGUILayout.ObjectField("Prefab", prefab, typeof(GameObject), false) as GameObject;
+            prefab =
+                EditorGUILayout.ObjectField("Prefab", prefab, typeof(GameObject), false)
+                as GameObject;
 
             gridSize = EditorGUILayout.FloatField("Grid Size", gridSize);
             GUILayout.EndVertical();
@@ -121,7 +102,6 @@ namespace CityManagerEditor
 
             if (GUILayout.Button("Merge Meshes"))
             {
-                //myScript.MergeMeshes();
                 MergeMeshes();
             }
 
@@ -129,23 +109,27 @@ namespace CityManagerEditor
 
             if (GUILayout.Button("Clear"))
             {
-                //myScript.MergeMeshes();
                 ClearObjects();
             }
 
             GUILayout.EndVertical();
-
         }
 
         [DrawGizmo(GizmoType.NonSelected)]
         private void OnSceneGUI()
         {
-            Renderer prefabRenderer = prefab.GetComponent<MeshRenderer>();
-            Bounds bounds = prefabRenderer.bounds;
+            Vector3 gizmoSize = new Vector3(gridSize, gridSize, gridSize);
+
+            try
+            {
+                Renderer prefabRenderer = prefab.GetComponent<MeshRenderer>();
+                gizmoSize = prefabRenderer.bounds.size;
+            }
+            catch { }
 
             // Draw a gizmo at the mouse hit position
             Handles.color = Color.green;
-            Handles.DrawWireCube(gizmoPosition, bounds.size);                       
+            Handles.DrawWireCube(gizmoPosition, gizmoSize);
 
             // Check if the left mouse button is pressed down
             if (Event.current.type == EventType.MouseDown && Event.current.button == 0)
@@ -159,10 +143,10 @@ namespace CityManagerEditor
             // Update the gizmo position based on the mouse position
             Event e = Event.current;
             if (e.type == EventType.MouseMove)
-            {           
+            {
                 var newPos = GetMouseHitPosition(e);
                 gizmoPosition = GetNearestPointOnGrid(newPos);
-                SceneView.RepaintAll();                
+                SceneView.RepaintAll();
             }
         }
 
@@ -179,8 +163,6 @@ namespace CityManagerEditor
 
             return position;
         }
-
-
 
         public Vector3 GetNearestPointOnGrid(Vector3 position)
         {
@@ -200,73 +182,109 @@ namespace CityManagerEditor
             return newPosition;
         }
 
-
-        private int GetObjectIndexAtPosition(Vector3 position)
+        public GameObject GetObjectByTagAndPosition(Vector3 position, string tag)
         {
-            for (int i = 0; i < mapObjects.Count; i++)
+            GameObject[] objectsWithTag = GameObject.FindGameObjectsWithTag(tag);
+            foreach (GameObject obj in objectsWithTag)
             {
-                if (mapObjects[i].position == position)
+                if (obj.transform.position == position)
                 {
-                    return i;
+                    return obj;
                 }
             }
-
-            return -1;
+            return null;
         }
 
+        public GameObject GetObjectByTagAndName(string tag, string nameSubstring)
+        {
+            try
+            {
+                GameObject[] objectsWithTag = GameObject.FindGameObjectsWithTag(tag);
+                foreach (GameObject obj in objectsWithTag)
+                {
+                    if (obj.name.ToLower().Contains(nameSubstring.ToLower()))
+                    {
+                        return obj;
+                    }
+                }
+            }
+            catch
+            {
+                return null;
+            }
+            return null;
+        }
 
         private void SpawnObject(GameObject prefab, Vector3 position)
         {
-            // Check if an object exists at the same position and replace it
-            int existingIndex = GetObjectIndexAtPosition(position);
-            if (existingIndex != -1)
+            // Check if an object exists at the same position and delete it
+            var oldObject = GetObjectByTagAndPosition(position, "Tile");
+            if (oldObject)
             {
-                MapObject removeObject = mapObjects[existingIndex];
-                mapObjects.RemoveAt(existingIndex);
-
-                // Destroy the object from the scene
-                if (removeObject.instance != null)
-                {
-                    UnityEngine.Object.DestroyImmediate(removeObject.instance);
-                }
+                UnityEngine.Object.Destroy(oldObject);
             }
 
-            // Create a new object and add it to the list
-            //GameObject newObject = new GameObject("New Object");
-            
-
             // Create a new instance of the selected prefab at the nearest grid point
-            GameObject instance = UnityEngine.Object.Instantiate(prefab, position, Quaternion.identity);
-            MapObject newObject = new MapObject(instance, position);
+            GameObject newObject = UnityEngine.Object.Instantiate(
+                prefab,
+                position,
+                Quaternion.identity
+            );
+
+            newObject.tag = "Tile";
             // Set the object's position
-            newObject.instance.transform.position = position;
-            mapObjects.Add(newObject);
+            newObject.transform.position = position;
 
             // Make the new object a child of the Holder object
-            if (GameObject.Find("Holder") == null)
+            var holder = GetObjectByTagAndName("Holder", newObject.name);
+
+            if (holder != null)
             {
-                GameObject holder = new GameObject("Holder");
-                newObject.instance.transform.parent = holder.transform;
+                newObject.transform.parent = holder.transform;
             }
             else
             {
-                newObject.instance.transform.parent = GameObject.Find("Holder").transform;
+                GameObject newHolder = new GameObject($"Holder-{newObject.name}");
+                newHolder.tag = "Holder";
+                newHolder.transform.position = newObject.transform.position;
+                newObject.transform.parent = newHolder.transform;
             }
+        }
+
+        public List<GameObject> GetChildrenOfGameObject(GameObject parentObject)
+        {
+            List<GameObject> children = new List<GameObject>();
+            Transform parentTransform = parentObject.transform;
+            int childCount = parentTransform.childCount;
+            for (int i = 0; i < childCount; i++)
+            {
+                Transform childTransform = parentTransform.GetChild(i);
+                GameObject child = childTransform.gameObject;
+                children.Add(child);
+            }
+            return children;
         }
 
         private void MergeMeshes()
         {
-            // Get the mesh renderers and filters of all the gameObjects
-            List<MeshFilter> meshFilters = new List<MeshFilter>();
-            List<MeshRenderer> meshRenderers = new List<MeshRenderer>();
-            foreach (MapObject item in mapObjects)
+            GameObject selectedObject = Selection.activeGameObject;
+
+            if (selectedObject == null || !selectedObject.name.Contains("Holder"))
             {
-                MeshFilter meshFilter = item.instance.GetComponent<MeshFilter>();
-                MeshRenderer meshRenderer = item.instance.GetComponent<MeshRenderer>();
-                if (meshFilter != null && meshRenderer != null)
+                return;
+            }
+
+            var children = GetChildrenOfGameObject(selectedObject);
+            Debug.Log(selectedObject.name + " " + children.Count);
+
+            // Get the mesh filters of all the gameObjects
+            List<MeshFilter> meshFilters = new List<MeshFilter>();
+            foreach (GameObject item in children)
+            {
+                MeshFilter meshFilter = item.GetComponent<MeshFilter>();
+                if (meshFilter != null)
                 {
                     meshFilters.Add(meshFilter);
-                    meshRenderers.Add(meshRenderer);
                 }
             }
 
@@ -281,47 +299,30 @@ namespace CityManagerEditor
             combinedMesh.CombineMeshes(combineInstances, true);
 
             // Create a new GameObject with the combined mesh
-            GameObject mergedObject = new GameObject("Merged Object");
+            GameObject mergedObject = new GameObject($"{selectedObject.name}-merged");
             mergedObject.AddComponent<MeshFilter>().sharedMesh = combinedMesh;
-            mergedObject.AddComponent<MeshRenderer>().sharedMaterial = meshRenderers[0].sharedMaterial;
-
-
-            if (GameObject.Find("Holder") == null)
-            {
-                GameObject holder = new GameObject("Holder");
-                mergedObject.transform.parent = holder.transform;
-            }
-
+            mergedObject.AddComponent<MeshRenderer>().sharedMaterial = children[0]
+                .GetComponent<MeshRenderer>()
+                .sharedMaterial;
 
             // Set the position and rotation of the new GameObject to match the first GameObject
-            //mergedObject.transform.position = mapObjects[0].position;
-            mergedObject.transform.rotation = mapObjects[0].instance.transform.rotation;
-
-
+            mergedObject.transform.parent = selectedObject.transform;
+            mergedObject.transform.rotation = children[0].transform.rotation;
 
             // Delete the original gameObjects
-            for(int i=0; i<mapObjects.Count; i++) 
+            for (int i = 0; i < children.Count; i++)
             {
-                if (mapObjects[i].instance)
+                if (children[i])
                 {
-                    DestroyImmediate(mapObjects[i].instance);
+                    DestroyImmediate(children[i]);
                 }
             }
-
-            ClearObjects();
         }
+
 
         private void ClearObjects()
         {
-            for (int i = 0; i < mapObjects.Count; i++)
-            {
-                //if (mapObjects[i].instance)
-                //{
-                //    DestroyImmediate(mapObjects[i].instance);
-                //}
-                mapObjects.RemoveAt(i);
-            }
+            
         }
-
     }
 }
