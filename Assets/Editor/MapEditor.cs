@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -14,11 +15,12 @@ namespace CityManagerEditor
 
         public float gridSize = 1.0f;
         private Vector3 gizmoPosition = Vector3.zero;
+        private Vector3 gizmoSize = Vector3.one;
 
         [SerializeField]
         public VisualTreeAsset m_VisualTreeAsset = default;
 
-        [MenuItem("Window/UI Toolkit/GridBrush")]
+        [MenuItem("Window/Level Editor")]
         public static void ShowExample()
         {
             MapEditor wnd = GetWindow<MapEditor>();
@@ -118,7 +120,7 @@ namespace CityManagerEditor
         [DrawGizmo(GizmoType.NonSelected)]
         private void OnSceneGUI()
         {
-            Vector3 gizmoSize = new Vector3(gridSize, gridSize, gridSize);
+            gizmoSize = new Vector3(gridSize, gridSize, gridSize);
 
             try
             {
@@ -141,6 +143,7 @@ namespace CityManagerEditor
         private void UpdateGizmoPosition()
         {
             // Update the gizmo position based on the mouse position
+
             Event e = Event.current;
             if (e.type == EventType.MouseMove)
             {
@@ -168,13 +171,10 @@ namespace CityManagerEditor
         {
             // Round the position values to the nearest multiple of gridSize
             float x = Mathf.Round(position.x / gridSize) * gridSize;
-
-            Renderer prefabRenderer = prefab.GetComponent<MeshRenderer>();
-            Bounds bounds = prefabRenderer.bounds;
-
-            //float y = Mathf.Round(position.y / gridSize) * gridSize;
-            float y = position.y + bounds.size.y / 2;
             float z = Mathf.Round(position.z / gridSize) * gridSize;
+
+            // Calculate the Y position
+            float y = Mathf.Round((position.y + gizmoSize.y / 2) / 0.1f) * 0.1f;
 
             // Create a new vector with the rounded values
             Vector3 newPosition = new Vector3(x, y, z);
@@ -215,13 +215,36 @@ namespace CityManagerEditor
             return null;
         }
 
+        public bool CanSpawn(GameObject prefab, Vector3 position, LayerMask layerMask)
+        {
+            Vector3 spawnPos = position;
+            Vector3 size = prefab.GetComponent<Renderer>().bounds.size * 0.9f;
+            Collider[] overlaps = Physics.OverlapBox(
+                spawnPos,
+                size / 2f,
+                Quaternion.identity,
+                layerMask
+            );
+
+            Debug.Log($"{overlaps.Length}, {size}, {spawnPos}");
+
+            return overlaps.Length == 0;
+        }
+
         private void SpawnObject(GameObject prefab, Vector3 position)
         {
             // Check if an object exists at the same position and delete it
             var oldObject = GetObjectByTagAndPosition(position, "Tile");
             if (oldObject)
             {
-                UnityEngine.Object.Destroy(oldObject);
+                UnityEngine.Object.DestroyImmediate(oldObject);
+            }
+
+            int layerMask = LayerMask.GetMask("Default");
+
+            if (CanSpawn(prefab, position, layerMask) == false)
+            {
+                return;
             }
 
             // Create a new instance of the selected prefab at the nearest grid point
@@ -232,6 +255,8 @@ namespace CityManagerEditor
             );
 
             newObject.tag = "Tile";
+            BoxCollider boxCollider = newObject.AddComponent<BoxCollider>();
+
             // Set the object's position
             newObject.transform.position = position;
 
@@ -289,13 +314,14 @@ namespace CityManagerEditor
             }
 
             // Combine the meshes
-            Mesh combinedMesh = new Mesh();
             CombineInstance[] combineInstances = new CombineInstance[meshFilters.Count];
             for (int i = 0; i < meshFilters.Count; i++)
             {
                 combineInstances[i].mesh = meshFilters[i].sharedMesh;
                 combineInstances[i].transform = meshFilters[i].transform.localToWorldMatrix;
             }
+
+            Mesh combinedMesh = new Mesh();
             combinedMesh.CombineMeshes(combineInstances, true);
 
             // Create a new GameObject with the combined mesh
@@ -309,6 +335,10 @@ namespace CityManagerEditor
             mergedObject.transform.parent = selectedObject.transform;
             mergedObject.transform.rotation = children[0].transform.rotation;
 
+            // Add the mesh collider to the new gameobject
+            MeshCollider meshCollider = mergedObject.AddComponent<MeshCollider>();
+            meshCollider.sharedMesh = combinedMesh;
+
             // Delete the original gameObjects
             for (int i = 0; i < children.Count; i++)
             {
@@ -319,10 +349,6 @@ namespace CityManagerEditor
             }
         }
 
-
-        private void ClearObjects()
-        {
-            
-        }
+        private void ClearObjects() { }
     }
 }

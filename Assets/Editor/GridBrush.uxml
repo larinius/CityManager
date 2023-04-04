@@ -5,6 +5,4 @@
     xmlns:editor="UnityEditor.UIElements"
     xsi:noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd"
 >
-    <Style src="project://database/Assets/Tools/GridBrush.uss?fileID=7433441132597879392&amp;guid=e8237faec6aa534429f76a46d3b0e61f&amp;type=3#GridBrush" />
-
 </engine:UXML>

@@ -1,5 +1,12 @@
 {
   "dependencies": {
+    "com.sarpersoher.ide.sublimetext": {
+      "version": "https://github.com/ssoher/com.sarpersoher.ide.sublimetext.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "09984c3262159b77a930b7576c917ef4acfa1048"
+    },
     "com.siccity.gltfutility": {
       "version": "git@github.com:Siccity/GLTFUtility.git",
       "depth": 0,

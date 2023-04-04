@@ -1,0 +1,6 @@
+﻿<UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:ScrollView style="width: 150px; height: 300px;">
+    <ui:Label text="Prefabs" style="font-size: 18px; font-weight: bold; margin-bottom: 5px;"></ui:Label>
+    <ui:VisualElement name="prefabList"></ui:VisualElement>
+  </ui:ScrollView>
+</UXML>
