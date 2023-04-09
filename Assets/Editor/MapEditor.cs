@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -12,10 +13,19 @@ namespace CityManagerEditor {
         Delete
     }
 
-    public class MapEditor : EditorWindow {
+
+
+    public partial class MapEditor : EditorWindow {
+        private Vector2 scrollPosition;
+
+        // The list of asset IDs
+        public List<string> assetIDs;
+
+        // The file name for the JSON file
+        public string fileName = "AssetList.json";
+
         private EditorState currentState = EditorState.Build;
 
-        //public GameObject[] prefabs;
         private GameObject prefab = null;
 
         public float gridSize = 1.0f;
@@ -39,20 +49,17 @@ namespace CityManagerEditor {
         private bool scatterMode = false;
         private float scatterRadius = 3.0f;
 
-        private List<GameObject> pallete = new List<GameObject>();
-        private int palleteTileWidth = 50;  // number of buttons per row
+        [SerializeField]
+        private List<GameObject> palette = new List<GameObject>();
+
+
+
+        private int paletteTileWidth = 100;  // number of buttons per row
 
         [SerializeField]
         public VisualTreeAsset m_VisualTreeAsset = default;
 
         [MenuItem("Window/Level Editor")]
-        public static void ShowExample() {
-            MapEditor wnd = GetWindow<MapEditor>();
-            wnd.titleContent = new GUIContent("GridBrush");
-        }
-
-        public void CreateGUI() {
-        }
 
         [InitializeOnLoadMethod]
         public static void Initialize() {
@@ -63,11 +70,26 @@ namespace CityManagerEditor {
             SceneView.duringSceneGui += UpdateGizmoPositionHandler;
             // Register a callback for the hierarchyChanged event
 
+            if (paletteDictionary.Count == 0) {
+                CreateNewPalette("Default");
+                paletteKey = "Default";
+                UpdatePaletteSelector();
+            }
         }
 
         private void OnDisable() {
             // Unregister the callback for the hierarchyChanged event
+            // Load the asset IDs from the JSON file
+            SaveListToJson(palette, "Palette");
+        }
 
+        private void Awake() {
+            // Get the serialized list from EditorPrefs
+        }
+
+        // Save the palette list to EditorPrefs on OnDestroy
+        private void OnDestroy() {
+            // Serialize the list to a string
         }
 
         private static void UpdateGizmoPositionHandler(SceneView sceneView) {
@@ -95,123 +117,10 @@ namespace CityManagerEditor {
             GameObject newSelection = Selection.activeObject as GameObject;
             if (prefab != null) {
                 // Add the selected prefab to the palette if it's not already there
-                pallete.Add(prefab);
+                paletteDictionary[paletteKey].Prefabs.Add(prefab);
+                //var assetID = GetPrefabAssetID(prefab);
+                //assetIDs.Add(assetID);
             }
-        }
-
-        private void OnGUI() {
-            // Create GUI layout for prefab palette
-            GUILayout.BeginVertical();
-            //foreach (GameObject prefab in prefabs) {
-            //    if (GUILayout.Button(prefab.name)) {
-            //        // Select the prefab when the button is clicked
-            //        Selection.activeObject = prefab;
-            //    }
-            //}
-
-            if (GUILayout.Button("Add prefab")) {
-                AddPrefab(Selection.activeObject as GameObject);
-            }
-
-            if (GUILayout.Button("Clear")) {
-                pallete.Clear();
-            }
-
-            GUILayout.EndVertical();
-
-            // Draw a line to separate the palette from the scene view
-            GUILayout.Box("", GUILayout.ExpandWidth(true), GUILayout.Height(1));
-
-            // Create GUI layout for brush settings
-            GUILayout.BeginVertical();
-            GUILayout.Label("Brush Settings:");
-            // Check if prefab is null, and if so, assign a default value
-            //if (prefab == null) {
-            //    prefab = Resources.Load<GameObject>("DefaultPrefab");
-            //}
-
-            // Show the prefab field in the GUI
-            //try {
-            //    prefab =
-            //        EditorGUILayout.ObjectField("Prefab", prefab, typeof(GameObject), false)
-            //        as GameObject;
-            //}
-            //catch {
-            //}
-
-            gridSize = EditorGUILayout.FloatField("Grid Size", gridSize, GUILayout.Width(200));
-            GUILayout.EndVertical();
-
-            GUILayout.BeginVertical();
-
-            for (int row = 0; row < 3; row++) {
-                GUILayout.BeginHorizontal();
-                for (int col = 0; col < 3; col++) {
-                    int index = row * 3 + col;
-                    if (index >= pallete.Count) {
-                        // If we reach the end of the button list, draw an empty space
-                        GUILayout.Box("", GUILayout.Width(palleteTileWidth), GUILayout.Height(palleteTileWidth));
-                    }
-                    else {
-                        Texture2D preview = AssetPreview.GetAssetPreview(pallete[index].gameObject);
-                        if (GUILayout.Button(new GUIContent(preview), GUILayout.Width(100), GUILayout.Height(100))) {
-                            Debug.Log($"Button at ({index}) was clicked");
-                        }
-                    }
-                }
-                GUILayout.EndHorizontal();
-            }
-
-            GUILayout.EndVertical();
-
-            GUILayout.BeginVertical();
-            GUILayout.Space(20);
-            GUILayout.BeginHorizontal(EditorStyles.toolbar);
-            currentState = (EditorState)
-                GUILayout.Toolbar(
-                    (int)currentState,
-                    new string[] { "Build", "Paint", "Fill" },
-                    EditorStyles.toolbarButton
-                );
-
-            GUILayout.EndHorizontal();
-
-            GUILayout.Space(20);
-
-            GUILayout.Space(10);
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("Random rotation", GUILayout.Width(150));
-            rotateX = EditorGUILayout.ToggleLeft("X", rotateX, GUILayout.Width(50));
-            rotateY = EditorGUILayout.ToggleLeft("Y", rotateY, GUILayout.Width(50));
-            rotateZ = EditorGUILayout.ToggleLeft("Z", rotateZ, GUILayout.Width(50));
-            EditorGUILayout.EndHorizontal();
-            snapRotation90 = EditorGUILayout.Toggle("Snap rotation to 90", snapRotation90, GUILayout.Width(150));
-
-            GUILayout.Space(20);
-            EditorGUILayout.BeginVertical();
-            scatterMode = EditorGUILayout.Toggle("Scatter objects", scatterMode, GUILayout.Width(200));
-            scatterRadius = EditorGUILayout.FloatField("Radius", scatterRadius, GUILayout.Width(200));
-            EditorGUILayout.EndVertical();
-
-            GUILayout.Space(20);
-
-            GUILayout.EndVertical();
-
-            GUILayout.BeginVertical();
-
-            GUILayout.Space(20);
-
-            if (GUILayout.Button("Merge Meshes")) {
-                MergeMeshes();
-            }
-
-            GUILayout.Space(20);
-
-            if (GUILayout.Button("Clear")) {
-                ClearObjects();
-            }
-
-            GUILayout.EndVertical();
         }
 
         [DrawGizmo(GizmoType.NonSelected)]
@@ -267,72 +176,6 @@ namespace CityManagerEditor {
             }
         }
 
-        private Vector3 GetMouseHitPosition(Event e) {
-            Vector3 position = Vector3.zero;
-            Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
-            RaycastHit hit;
-
-            if (Physics.Raycast(ray.origin, ray.direction, out hit, Mathf.Infinity)) {
-                position = hit.point;
-            }
-
-            return position;
-        }
-
-        public Vector3 GetNearestPointOnGrid(Vector3 position) {
-            // Round the position values to the nearest multiple of gridSize
-            float x = Mathf.Round(position.x / gridSize) * gridSize;
-            float z = Mathf.Round(position.z / gridSize) * gridSize;
-
-            // Calculate the Y position
-            float y = Mathf.Round((position.y + gizmoSize.y / 2) / 0.1f) * 0.1f;
-
-            // Create a new vector with the rounded values
-            Vector3 newPosition = new Vector3(x, y, z);
-
-            return newPosition;
-        }
-
-        public GameObject GetObjectByTagAndPosition(Vector3 position, string tag) {
-            GameObject[] objectsWithTag = GameObject.FindGameObjectsWithTag(tag);
-            foreach (GameObject obj in objectsWithTag) {
-                if (obj.transform.position == position) {
-                    return obj;
-                }
-            }
-            return null;
-        }
-
-        public GameObject GetObjectByTagAndName(string tag, string nameSubstring) {
-            try {
-                GameObject[] objectsWithTag = GameObject.FindGameObjectsWithTag(tag);
-                foreach (GameObject obj in objectsWithTag) {
-                    if (obj.name.ToLower().Contains(nameSubstring.ToLower())) {
-                        return obj;
-                    }
-                }
-            }
-            catch {
-                return null;
-            }
-            return null;
-        }
-
-        public bool CanSpawn(GameObject prefab, Vector3 position, LayerMask layerMask) {
-            Vector3 spawnPos = position;
-            Vector3 size = prefab.GetComponent<Renderer>().bounds.size * 0.9f;
-            Collider[] overlaps = Physics.OverlapBox(
-                spawnPos,
-                size / 2f,
-                Quaternion.identity,
-                layerMask
-            );
-
-            Debug.Log($"{overlaps.Length}, {size}, {spawnPos}");
-
-            return overlaps.Length == 0;
-        }
-
         private void SpawnObject(GameObject prefab, Vector3 position) {
             // Check if an object exists at the same position and delete it
             var oldObject = GetObjectByTagAndPosition(position, "Tile");
@@ -371,18 +214,6 @@ namespace CityManagerEditor {
                 newHolder.transform.position = newObject.transform.position;
                 newObject.transform.parent = newHolder.transform;
             }
-        }
-
-        public List<GameObject> GetChildrenOfGameObject(GameObject parentObject) {
-            List<GameObject> children = new List<GameObject>();
-            Transform parentTransform = parentObject.transform;
-            int childCount = parentTransform.childCount;
-            for (int i = 0; i < childCount; i++) {
-                Transform childTransform = parentTransform.GetChild(i);
-                GameObject child = childTransform.gameObject;
-                children.Add(child);
-            }
-            return children;
         }
 
         private void MergeMeshes() {
